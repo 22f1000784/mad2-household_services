@@ -7,7 +7,7 @@ export default {
 	        </div>
 	    </nav>
 	     <div class="d-flex justify-content-center align-items-center vh-100">
-	         <button class="btn btn-danger bg-light text-danger border border-danger">Register</button>
+	         <button class="btn btn-danger bg-light text-danger border border-danger" @click = "registeration">Register</button>
 	  </div>
 
 	             </div>`,
@@ -16,8 +16,24 @@ methods:{
 	login() {
 		this.$router.push('/login');
 
+	},
+	registeration(){
+		this.$router.push('/register');
 	}
 
+},
+data(){
+	return{
+		form: {
+			name: '',
+			age: '',
+			phone: '',
+			email: '',
+			role: 'customer',
+			description: '',
+			experience: ''
+		  }
+	};
 }
 }
 

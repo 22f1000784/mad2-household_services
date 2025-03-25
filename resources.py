@@ -4,6 +4,7 @@ from sqlalchemy import select
 from flask import jsonify,json,request,Response
 from models import *
 from database import db
+from flask_security import roles_required, auth_required
 from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 class userlogin(Resource):
@@ -43,10 +44,10 @@ class Customer(Resource):
         phone = args['customer_phone']
         password = args['customer_password']
         customer_role = args['customer_role']
-        customer_status = args['customer_status']
+        
         role = Role.query.filter_by(name = customer_role).first()
         print(role)
-        user = datastore.create_user(name = name,age = age, email = email,phone = phone, password = generate_password_hash(password),active = customer_status,roles= [role])
+        user = datastore.create_user(name = name,age = age, email = email,phone = phone,active = False, password = generate_password_hash(password),roles= [role])
         try:
             db.session.add(user)
             db.session.commit()
@@ -89,7 +90,8 @@ class Customer(Resource):
             return resp
 
 class service(Resource):
-
+    @auth_required('token')
+    @roles_required('admin')
     def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('name', type = str, required = True, help = 'Name cannot be blank')

@@ -1,5 +1,11 @@
 export default { template:`
 	<body class="bg-light">
+    <nav class="navbar navbar-light bg-light">
+  <div class="container">
+    <a href="/" class="btn btn-outline-primary">Back to Home</a>
+  </div>
+</nav>
+
     <!-- Error Message -->
     <div class="d-flex justify-content-center align-items-center vh-100 flex-column">
         <!-- Conditionally display the error message -->
@@ -73,7 +79,11 @@ export default { template:`
 		       console.log(data);
 		       localStorage.setItem('token',data.authentication_token);
 		       localStorage.setItem('role',data.role);
-		       this.$router.push('/admin')
+               console.log(data.role)
+               if(data.role == 'admin'){
+                this.$router.push('/admin')
+               }
+		       
 	       }
 		   else{
 			this.error = data['message']

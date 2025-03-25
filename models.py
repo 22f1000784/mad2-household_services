@@ -13,7 +13,7 @@ class User(db.Model,UserMixin):
      id = db.Column(db.Integer, primary_key=True)
      email = db.Column(db.String(255), unique=True, nullable=False)
      password = db.Column(db.String(255), nullable=False)
-     active = db.Column(db.Boolean, default=True)
+     active = db.Column(db.Boolean, default=False)
      fs_uniquifier = db.Column(db.String(255),default = lambda:str(uuid4()), unique=True)
      roles = db.relationship('Role', secondary=user_roles, backref = 'users')
      name = db.Column(db.String(15))
