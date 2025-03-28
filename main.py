@@ -1,10 +1,10 @@
-from flask import Flask,render_template,url_for, request, jsonify
+from flask import Flask,render_template,url_for, request, jsonify,Response,json
 from config import config
 from werkzeug.security import generate_password_hash
-from models import User,Role,Service
+from models import User,Role,Service,Service_request,Proffessional
 from flask_restful import Api, marshal, fields
-from resources import UserResource,Customer,service,userlogin
-from flask_security import Security,SQLAlchemyUserDatastore,auth_required,roles_required
+from resources import UserResource,Customer,service,userlogin,ServiceRequestAPI,AcceptServiceRequest,RejectServiceRequest
+from flask_security import Security,SQLAlchemyUserDatastore,auth_required,roles_required,roles_accepted,current_user
 from database import db
 #rint(app.config['SQLALCHEMY_DATABASE_URI'])
 from config import datastore
@@ -27,6 +27,11 @@ api.add_resource(Customer,'/customer/<int:customer_id>', endpoint = "customer_ge
 api.add_resource(service,'/service/creation',endpoint = 'service_creation')
 api.add_resource(service,'/service/<int:service_id>',endpoint = "service_get")
 api.add_resource(userlogin,'/user-login',endpoint ='login')
+api.add_resource(ServiceRequestAPI, '/service-request/<int:proffesional_id>', endpoint='service_request')
+api.add_resource(AcceptServiceRequest, "/accept_request/<int:request_id>")
+api.add_resource(RejectServiceRequest, "/reject_request/<int:request_id>")
+
+
 with app.app_context():
     db.create_all()
     if not db.session.query(Role).filter_by(id = 1).first():
@@ -55,15 +60,26 @@ def home():
     return render_template("index.html")
 
 
-professional_fields = {
-    'description':fields.String,
-    'experience':fields.Integer
 
-}
 
 role_fields ={
     'name':fields.String,
     'description':fields.String
+}
+service_fields = {
+    "id": fields.Integer,
+    "name": fields.String,
+    "price": fields.Integer,
+    "time_required": fields.Integer,
+    "Description":fields.String
+}
+
+proffesional_fields = {
+    'id':fields.Integer,
+    'description':fields.String,
+    'experience':fields.Integer,
+    'service': fields.Nested(service_fields, allow_null=True)
+
 }
 
 user_fields = {
@@ -73,16 +89,90 @@ user_fields = {
     'phone':fields.Integer,
     "roles": fields.List(fields.Nested(role_fields)),
     'active':fields.Boolean,
-    "professional": fields.Nested(professional_fields, allow_null=True)
+    "proffesional": fields.Nested(proffesional_fields, allow_null=True)
 }
 
-service_fields = {
+service_request_fields = {
     "id": fields.Integer,
-    "name": fields.String,
-    "price": fields.Integer,
-    "time_required": fields.Integer,
-    "Description":fields.String
+    "service_id": fields.Integer,
+    "customer_id": fields.Integer,
+    "proffesional_id": fields.Integer,
+    "date_of_request": fields.String,
+    "date_of_completion": fields.String,
+    "service_status": fields.String,
+    "remarks": fields.String,
+    "service": fields.Nested(service_fields),
+    "customer": fields.Nested(user_fields),
+    "proffessional": fields.Nested(proffesional_fields)
 }
+
+
+@app.get('/proffesional/service-requests')
+@auth_required('token')
+@roles_required('professional')
+def get_proffesional_requests():
+    # Fetch professional ID from current_user
+    proffesional = Proffessional.query.filter_by(id=current_user.proffesional.id).first()
+
+    if not proffesional:
+        return Response(json.dumps({"message": "Professional profile not found"}), status=404, mimetype='application/json')
+
+    # Fetch service requests for the professional
+    service_requests = Service_request.query.filter_by(proffesional_id=proffesional.id).all()
+
+    if not service_requests:
+        return Response(json.dumps({"message": "No service requests found"}), status=404, mimetype='application/json')
+
+    return Response(json.dumps(marshal(service_requests, service_request_fields)), status=200, mimetype='application/json')
+
+
+@app.route('/close_request/<int:request_id>', methods=['POST'])
+@auth_required('token')
+@roles_required('customer')
+def close_request(request_id):
+    data = request.get_json()
+    remarks = data.get("remarks")
+
+    if not remarks:
+        return jsonify({"error": "Remarks required"}), 400
+
+    service_request = Service_request.query.filter_by(id = request_id).first()
+    if not service_request:
+        return jsonify({"error": "Service request not found"}), 404
+
+    service_request.service_status = "completed"
+    service_request.remarks = remarks
+    db.session.add(service_request)
+    db.session.commit()
+
+    return jsonify({"message": "Service request closed successfully"}), 200
+
+
+@app.get('/all_service_requests')
+@auth_required('token')
+@roles_accepted('admin','customer')
+def all_service_requests():
+    service_requests = Service_request.query.all()
+    if len(service_requests) == 0:
+        message = json.dumps({"message": "No service request found"})
+        resp = Response(message, status=404, mimetype='application/json')
+        return resp
+    else:
+        if(current_user.roles[0].name == 'customer'):
+            service_requests = Service_request.query.filter_by(customer_id = current_user.id).all()
+            return marshal(service_requests, service_request_fields), 202
+    
+
+
+@app.route("/api/services", methods=["GET"])
+def get_services():
+    """API endpoint to fetch all service names."""
+    try:
+            services = Service.query.with_entities(Service.id, Service.name).all()
+            service_list = [{"id": service.id, "name": service.name} for service in services]
+            return jsonify(service_list),202
+    except:
+            return "something went wrong",404
 
 @app.get('/all_services')
 @auth_required('token')
@@ -96,7 +186,7 @@ def all_services():
 
 @app.get('/allusers')
 @auth_required('token')
-@roles_required('admin')
+@roles_accepted('customer', 'admin')
 def allusers():
     users = User.query.all()
     if(len(users) == 0):

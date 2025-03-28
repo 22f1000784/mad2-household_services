@@ -83,6 +83,12 @@ export default { template:`
                if(data.role == 'admin'){
                 this.$router.push('/admin')
                }
+               if(data.role == 'customer'){
+                this.$router.push('/customer')
+               }
+               if(data.role == 'professional'){
+                this.$router.push('/proffesional')
+               }
 		       
 	       }
 		   else{

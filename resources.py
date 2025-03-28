@@ -4,9 +4,11 @@ from sqlalchemy import select
 from flask import jsonify,json,request,Response
 from models import *
 from database import db
-from flask_security import roles_required, auth_required
+from flask_security import roles_required, auth_required,current_user
 from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
+from datetime import datetime
+from sqlalchemy.exc import SQLAlchemyError
 class userlogin(Resource):
      def post(self):
         data = request.get_json()
@@ -48,15 +50,21 @@ class Customer(Resource):
         role = Role.query.filter_by(name = customer_role).first()
         print(role)
         user = datastore.create_user(name = name,age = age, email = email,phone = phone,active = False, password = generate_password_hash(password),roles= [role])
+        db.session.add(user)
+        db.session.commit()
         try:
-            db.session.add(user)
-            db.session.commit()
+            
             
             if user.roles[0] == 'professional':
                 try:
+                    service_name = args['service']
+                    print(service_name)
+                    service = Service.query.filter_by(id = service_name).first()
+                    print(service)
+                    
                     description = args['description']
                     experience = args['experience']
-                    new_proffessional = Proffessional(description = description, experience = experience,user = user) 
+                    new_proffessional = Proffessional(description = description, experience = experience,user = user,service_id = service.id) 
                     db.session.add(new_proffessional)
                     db.session.commit()
                     return jsonify({"message":" proffesional is created"})
@@ -127,8 +135,85 @@ class service(Resource):
             return ({"error":"invalid service id"}),200
 
 
+class ServiceRequestAPI(Resource):
+    @auth_required('token')
+    def post(self, proffesional_id):
+        try:
+            # Fetch professional details using ID from URL
+            proffesional = Proffessional.query.filter_by(id = proffesional_id).first()
+            if not proffesional:
+                return jsonify({"error": "Invalid proffesional ID"}), 404
 
+            # Fetch associated service ID
+            service_id = proffesional.service.id if proffesional.service else None
+            if not service_id:
+                return jsonify({"error": "Proffesional does not have an associated service"}), 404
 
+            # Fetch customer ID from authenticated user
+            customer_id = current_user.id
 
+            # Extract remarks from request body (optional)
+            data = request.get_json()
+            remarks = data.get("remarks", "")
 
+            # Create a new service request
+            new_request = Service_request(
+                service_id=service_id,
+                customer_id=customer_id,
+                proffesional_id=proffesional_id,
+                date_of_request=datetime.utcnow(),
+                service_status="Pending",
+                remarks=remarks
+            )
+
+            db.session.add(new_request)
+            db.session.commit()
+
+            message = json.dumps({"message": "Service request created successfully!"})
+            return Response(message, status=201, mimetype='application/json')
+
+        
+
+        except Exception as e:
+            db.session.rollback()
+            message = json.dumps({"error": str(e)})
+            return Response(message, status=500, mimetype='application/json')
+
+class AcceptServiceRequest(Resource):
+    @auth_required("token")  # Ensure authentication
+    def post(self, request_id):
+        # Fetch the service request
+        service_request = Service_request.query.get(request_id)
+        
+        if not service_request:
+            return ({"message": "Service request not found"}), 404
+
+        # Ensure the logged-in user is the assigned professional
+        if service_request.proffesional_id != current_user.proffesional.id:
+            return ({"message": "Unauthorized access"}), 403
+        
+        # Update service request status to "accepted"
+        service_request.service_status = "accepted"
+        db.session.commit()
+
+        return ({"message": "Service request accepted successfully"}), 200
+
+class RejectServiceRequest(Resource):
+    @auth_required("token")  # Ensure authentication
+    def post(self, request_id):
+        # Fetch the service request
+        service_request = Service_request.query.get(request_id)
+        
+        if not service_request:
+            return ({"message": "Service request not found"}), 404
+
+        # Ensure the logged-in user is the assigned professional
+        if service_request.proffesional_id != current_user.proffesional.id:
+            return ({"message": "Unauthorized access"}), 403
+        
+        # Update service request status to "accepted"
+        service_request.service_status = "rejected"
+        db.session.commit()
+
+        return ({"message": "Service request accepted successfully"}), 200
 

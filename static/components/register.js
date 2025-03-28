@@ -51,6 +51,14 @@ export default {
               <label class="form-label">Experience (in years)</label>
               <input type="number" class="form-control" v-model="form.experience" />
             </div>
+            <div>
+              <label for="service">Choose a Service:</label>
+              <select v-model="selectedService">
+                <option v-for="service in services" :key="service.id" :value="service.id">
+                {{ service.name }}
+                </option>
+             </select>
+           </div>
           </div>
         </transition>
 
@@ -71,9 +79,15 @@ export default {
         description: '',
         experience: '',
         password:''
-      }
+      },
+      services: [], // Stores service names from API
+      selectedService: null, // Stores the chosen service ID
     };
   },
+  mounted() {
+      this.fetchServices();
+  },
+
   methods: {
     async submitForm() {
         const apiUrl = "http://127.0.0.1:5000/customer/registration"; // Replace with your actual backend URL
@@ -93,7 +107,10 @@ export default {
         if (this.form.role === "professional") {
             payload.description = this.form.description;
             payload.experience = this.form.experience;
+            payload.service = this.selectedService
+            console.log(payload.service)
         }
+          
 
         try {
             const response = await fetch(apiUrl, {
@@ -122,6 +139,18 @@ export default {
       if (this.form.role === 'customer') {
         this.form.description = '';
         this.form.experience = '';
+      }
+    },
+    async fetchServices() {
+      try {
+        const response = await fetch("/api/services");
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.json();
+        this.services = data; // Store services in the data property
+      } catch (error) {
+        console.error("Error fetching services:", error);
       }
     }
   }

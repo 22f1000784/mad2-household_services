@@ -19,7 +19,7 @@ class User(db.Model,UserMixin):
      name = db.Column(db.String(15))
      age = db.Column(db.Integer)
      phone = db.Column(db.Integer,nullable = True,unique = True)
-     professional = db.relationship('Proffessional', uselist=False, back_populates='user',cascade = 'all,delete-orphan')
+     proffesional = db.relationship('Proffessional', uselist=False, back_populates='user',cascade = 'all,delete-orphan')
     
      def to_dict(self):
         return{"id":self.id,
@@ -40,9 +40,11 @@ class Proffessional(db.Model):
      __tablename__ = "proffesional"
      id = db.Column(db.Integer,primary_key = True)
      user_id = db.Column(db.ForeignKey("user.id",ondelete = 'CASCADE') )
+     service_id = db.Column(db.Integer, db.ForeignKey("service.id", ondelete="CASCADE"))
      description =db.Column(db.Text,nullable = False )
      experience = db.Column(db.Integer)
-     user = db.relationship("User",back_populates = 'professional')
+     service = db.relationship("Service", back_populates="professionals")
+     user = db.relationship("User",back_populates = 'proffesional')
 
 
 
@@ -53,6 +55,7 @@ class Service(db.Model):
      price = db.Column(db.Integer,nullable = False)
      time_required = db.Column(db.Integer())
      Description = db.Column(db.Text)
+     professionals = db.relationship("Proffessional", back_populates="service", cascade="all, delete")
 
 class Service_request(db.Model):
      __tablename__ = "service_request"

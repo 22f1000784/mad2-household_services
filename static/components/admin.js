@@ -56,7 +56,7 @@ export default {
       <div class="card shadow-sm p-3">
         <h3 class="text-success">Professionals</h3>
         <ul class="list-group">
-          <li v-for="pro in professionals" :key="pro.user.id" class="list-group-item d-flex justify-content-between align-items-center">
+          <li v-for="pro in proffesionals" :key="pro.user.id" class="list-group-item d-flex justify-content-between align-items-center">
             <div>
               <strong>Name:</strong> {{ pro.user.name }} |
               <strong>Age:</strong> {{ pro.user.age }} |
@@ -115,13 +115,13 @@ export default {
 	},
 	computed: {
 		customers() {
-		  return this.users.filter(user => !user.professional);
+		  return this.users.filter(user => !user.proffesional);
 		},
-		professionals() {
+		proffesionals() {
 		  return this.users
-			.filter(user => user.professional)
+			.filter(user => user.proffesional)
 			.map(user => ({
-			  ...user.professional, // Professional details
+			  ...user.proffesional, // Professional details
 			  user, // Corresponding user details
 			}));
 		}
