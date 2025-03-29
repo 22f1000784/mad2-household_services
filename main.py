@@ -1,4 +1,4 @@
-from flask import Flask,render_template,url_for, request, jsonify,Response,json
+from flask import Flask,render_template,url_for, request, jsonify,Response,json, send_file
 from config import config
 from werkzeug.security import generate_password_hash
 from models import User,Role,Service,Service_request,Proffessional
@@ -6,11 +6,11 @@ from flask_restful import Api, marshal, fields
 from resources import UserResource,Customer,service,userlogin,ServiceRequestAPI,AcceptServiceRequest,RejectServiceRequest
 from flask_security import Security,SQLAlchemyUserDatastore,auth_required,roles_required,roles_accepted,current_user
 from database import db
-
+import os
 from celery.schedules import crontab,timedelta
 from worker import celery_init_app
 
-from task import send_reminder_emails,send_monthly_report,send_test_report
+from task import send_reminder_emails,send_monthly_report,send_test_report,generate_csv
 
 #rint(app.config['SQLALCHEMY_DATABASE_URI'])
 from config import datastore
@@ -25,14 +25,11 @@ print(app.config['SQLALCHEMY_DATABASE_URI'])
 db.init_app(app)
 
 
-
-
-
-
  
 app.security = Security(app,datastore)
 app.app_context().push()
 celery_app = celery_init_app(app)
+
 
 print(app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'])
 
@@ -61,6 +58,18 @@ with app.app_context():
         datastore.create_user(email ='admin@email.com',password = generate_password_hash('admin'),active = True,name = 'Ayush',age = 26,phone = 9523601472,roles = [role])
         
         db.session.commit()
+
+
+@app.route('/download-report', methods=['GET'])
+def download_report():
+    """Trigger report generation & send it to admin in one click."""
+    task = generate_csv.apply_async()  # Start Celery task
+    file_path = task.get(timeout=30)   # Wait for task to complete (max 30 sec)
+
+    if not file_path or not os.path.exists(file_path):
+        return jsonify({"error": "Report generation failed!"}), 500
+
+    return send_file(file_path, as_attachment=True)
 
 
 @celery_app.on_after_finalize.connect

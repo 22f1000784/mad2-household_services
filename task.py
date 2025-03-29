@@ -6,8 +6,37 @@ from mail_service import send_email
 from sqlalchemy.orm import joinedload
 import pdfkit  # Install with `pip install pdfkit`
 import os
+import flask_excel as excel
+import pyexcel
+
+REPORTS_DIR = "generated_reports"
+os.makedirs(REPORTS_DIR, exist_ok=True) 
 
 
+
+@shared_task
+def generate_csv():
+    """Generate CSV of closed service requests."""
+    filename = f"closed_services_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.csv"
+    file_path = os.path.join(REPORTS_DIR, filename)
+
+    # Fetch closed service requests
+    closed_services = Service_request.query.filter_by(service_status="completed").all()
+    
+    # Convert data to CSV format
+    data = [["Service ID", "Customer ID", "Professional ID", "Request Date", "Remarks"]]
+    for service in closed_services:
+        data.append([
+            service.service_id,
+            service.customer_id,
+            service.proffesional_id,
+            service.date_of_request,
+            service.remarks
+        ])
+
+    # Save as CSV
+    pyexcel.save_as(array=data, dest_file_name=file_path)
+    return file_path
 
 
 @shared_task

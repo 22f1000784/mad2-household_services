@@ -28,6 +28,9 @@ export default {
         </div>
 
       </div>
+       <div>
+    <button @click="downloadReport" class="btn btn-primary">Download Report</button>
+  </div>
     </nav>
       <h2 class="text-center mb-4">Users List</h2>
 
@@ -85,10 +88,12 @@ export default {
 	},
 	methods:{
 		
-			logout(){
+			    logout(){
 				localStorage.clear();
 				this.$router.push('/login'); // Redirect to login page after logout
-			  },async toggleStatus(user) {
+			  },
+        
+    async toggleStatus(user) {
 				try {
 				  // Select endpoint based on the user's active status
 				  const endpoint = user.active ? `/deactivate_user/${user.id}` : `/activate_user/${user.id}`;
@@ -111,6 +116,35 @@ export default {
 				  console.error("Error updating user status:", error);
 				}
 			  },
+        async downloadReport() {
+          try {
+            const response = await fetch("http://127.0.0.1:5000/download-report", {
+              method: "GET",
+            });
+    
+            if (!response.ok) {
+              throw new Error("Failed to download the report");
+            }
+    
+            // Convert response to a Blob
+            const blob = await response.blob();
+    
+            // Create a download link
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.setAttribute("download", "service_report.csv"); // File name
+            document.body.appendChild(link);
+            link.click();
+    
+            // Cleanup
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          } catch (error) {
+            console.error("Error downloading report:", error);
+            alert("Failed to download the report. Please try again.");
+          }
+        },
 	
 	},
 	computed: {
