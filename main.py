@@ -6,6 +6,12 @@ from flask_restful import Api, marshal, fields
 from resources import UserResource,Customer,service,userlogin,ServiceRequestAPI,AcceptServiceRequest,RejectServiceRequest
 from flask_security import Security,SQLAlchemyUserDatastore,auth_required,roles_required,roles_accepted,current_user
 from database import db
+
+from celery.schedules import crontab,timedelta
+from worker import celery_init_app
+
+from task import send_reminder_emails,send_monthly_report,send_test_report
+
 #rint(app.config['SQLALCHEMY_DATABASE_URI'])
 from config import datastore
 
@@ -15,9 +21,18 @@ api = Api(app)
 
 app.config.from_object(config)
 print(app.config['SQLALCHEMY_DATABASE_URI'])
-db.init_app(app)  
+
+db.init_app(app)
+
+
+
+
+
+
+ 
 app.security = Security(app,datastore)
 app.app_context().push()
+celery_app = celery_init_app(app)
 
 print(app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'])
 
@@ -46,7 +61,25 @@ with app.app_context():
         datastore.create_user(email ='admin@email.com',password = generate_password_hash('admin'),active = True,name = 'Ayush',age = 26,phone = 9523601472,roles = [role])
         
         db.session.commit()
+
+
+@celery_app.on_after_finalize.connect
+def setup_periodic_tasks(sender, **kwargs):
+    sender.add_periodic_task(
+        crontab(minute=0, hour=0, day_of_month=1), 
+        send_reminder_emails.s(),
+    )
+
+    sender.add_periodic_task(
+        crontab(hour=00, minute=35),  # Runs at 00:00 on the 1st of every month
+        send_monthly_report.s(day_of_month=1, hour=0, minute=0),
+    )
        
+@app.route('/trigger-report', methods=['GET'])
+def trigger_report():
+    """API to manually trigger the monthly report generation."""
+    task = send_monthly_report.delay()  # Call Celery task asynchronously
+    return jsonify({"message": "Report generation started!", "task_id": task.id}), 202
 
 @app.route('/admin')
 @roles_required('admin')
