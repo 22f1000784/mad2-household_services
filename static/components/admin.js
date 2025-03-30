@@ -1,37 +1,29 @@
 export default {
-	template:`
-	  <div class="container mt-5">
-	  <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
-      <div class="container-fluid">
-        
-        <!-- App Name (Top Left) -->
-        <a class="navbar-brand fw-bold" href="#">Household App</a>
-
-        <!-- Responsive Toggle Button -->
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-
-        <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
-          <!-- Left Side: Navigation Links -->
-          <ul class="navbar-nav">
-            <li class="nav-item">
-              <router-link to="/createservice" class="nav-link">Create Service</router-link>
-            </li>
-			<li class="nav-item">
-              <router-link to="/services" class="nav-link">Services</router-link>
-            </li>
-          </ul>
-
-          <!-- Right Side: Logout Button -->
-          <button class="btn btn-danger" @click="logout">Logout</button>
+  template: `
+    <div class="container mt-5">
+      <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+        <div class="container-fluid">
+          <a class="navbar-brand fw-bold" href="#">Household App</a>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div class="collapse navbar-collapse justify-content-between" id="navbarNav">
+            <ul class="navbar-nav">
+              <li class="nav-item">
+                <router-link to="/createservice" class="nav-link">Create Service</router-link>
+              </li>
+              <li class="nav-item">
+                <router-link to="/services" class="nav-link">Services</router-link>
+              </li>
+            </ul>
+            <button class="btn btn-danger" @click="logout">Logout</button>
+          </div>
         </div>
+        <div>
+          <button @click="downloadReport" class="btn btn-primary">Download Report</button>
+        </div>
+      </nav>
 
-      </div>
-       <div>
-    <button @click="downloadReport" class="btn btn-primary">Download Report</button>
-  </div>
-    </nav>
       <h2 class="text-center mb-4">Users List</h2>
 
       <!-- Customers Section -->
@@ -46,133 +38,164 @@ export default {
               <strong>Role:</strong> {{ user.roles[0]?.name }}
             </div>
             <button 
-             class="btn" 
-               :class="user.active ? 'btn-danger' : 'btn-success'"
-                @click="toggleStatus(user)">
-                 {{ user.active ? 'Deactivate' : 'Activate' }}
-               </button>
+              class="btn" 
+              :class="user.active ? 'btn-danger' : 'btn-success'"
+              @click="toggleStatus(user)">
+              {{ user.active ? 'Deactivate' : 'Activate' }}
+            </button>
           </li>
         </ul> 
       </div>
 
-      <!-- Professionals Section -->
+      <!-- Professionals Section with Search -->
       <div class="card shadow-sm p-3">
         <h3 class="text-success">Professionals</h3>
+        
+        <!-- Search Input -->
+        <input v-model="searchQuery" @input="searchProfessionals" class="form-control mb-3" placeholder="Search professionals by name, service, or description">
+
         <ul class="list-group">
-          <li v-for="pro in proffesionals" :key="pro.user.id" class="list-group-item d-flex justify-content-between align-items-center">
+          <li v-for="pro in professionals" :key="pro.id" class="list-group-item d-flex justify-content-between align-items-center">
             <div>
-              <strong>Name:</strong> {{ pro.user.name }} |
-              <strong>Age:</strong> {{ pro.user.age }} |
-              <strong>Phone:</strong> {{ pro.user.phone }} |
-              <strong>Role:</strong> {{ pro.user.roles[0]?.name }} <br>
-              <strong>Description:</strong> {{ pro.description }} |
-              <strong>Experience:</strong> {{ pro.experience }} years
+              <strong>Name:</strong> {{ pro.name }} |
+              <strong>Age:</strong> {{ pro.age }} |
+              <strong>Phone:</strong> {{ pro.phone }} |
+              <strong>Role:</strong> {{ pro.roles[0]?.name }} <br>
+              <strong>Description:</strong> {{ pro.proffesional?.description || 'N/A' }} |
+              <strong>Experience:</strong> {{ pro.proffesional?.experience || 'N/A' }} years |
+              <strong>Service:</strong> {{ pro.proffesional?.service.name || 'N/A' }}
             </div>
             <button 
               class="btn" 
-              :class="pro.user.active ? 'btn-danger' : 'btn-success'"
-              @click="toggleStatus(pro.user)">
-              {{ pro.user.active ? 'Deactivate' : 'Activate' }}
+              :class="getButtonClass(pro)"
+              @click="toggleStatus(pro)">
+              {{ getButtonText(pro) }}
             </button>
           </li>
         </ul>
       </div>
     </div>
-	
-	`,
-	data(){
-		return{
-			users:[],
-			token:localStorage.getItem('token')
-		}
-	},
-	methods:{
-		
-			    logout(){
-				localStorage.clear();
-				this.$router.push('/login'); // Redirect to login page after logout
-			  },
-        
+  `,
+
+  data() {
+    return {
+      users: [],
+      searchQuery: '',
+      token: localStorage.getItem('token')
+    };
+  },
+
+  methods: {
+    logout() {
+      localStorage.clear();
+      this.$router.push('/login');
+    },
+
     async toggleStatus(user) {
-				try {
-				  // Select endpoint based on the user's active status
-				  const endpoint = user.active ? `/deactivate_user/${user.id}` : `/activate_user/${user.id}`;
-			
-				  const response = await fetch(endpoint, {
-					method: "POST",
-					headers: {
-					  "Content-Type": "application/json",
-					  "Authentication-Token": localStorage.getItem("token"),
-					},
-				  });
-			
-				  if (!response.ok) {
-					throw new Error("Failed to update user status");
-				  }
-			
-				  // Toggle status without page reload
-				  user.active = !user.active;
-				} catch (error) {
-				  console.error("Error updating user status:", error);
-				}
-			  },
-        async downloadReport() {
-          try {
-            const response = await fetch("http://127.0.0.1:5000/download-report", {
-              method: "GET",
-            });
-    
-            if (!response.ok) {
-              throw new Error("Failed to download the report");
-            }
-    
-            // Convert response to a Blob
-            const blob = await response.blob();
-    
-            // Create a download link
-            const url = window.URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.href = url;
-            link.setAttribute("download", "service_report.csv"); // File name
-            document.body.appendChild(link);
-            link.click();
-    
-            // Cleanup
-            document.body.removeChild(link);
-            window.URL.revokeObjectURL(url);
-          } catch (error) {
-            console.error("Error downloading report:", error);
-            alert("Failed to download the report. Please try again.");
-          }
-        },
-	
-	},
-	computed: {
-		customers() {
-		  return this.users.filter(user => !user.proffesional);
-		},
-		proffesionals() {
-		  return this.users
-			.filter(user => user.proffesional)
-			.map(user => ({
-			  ...user.proffesional, // Professional details
-			  user, // Corresponding user details
-			}));
-		}
-	  },
-	async mounted(){
-		const resp = await fetch('/allusers',{headers:{"Authentication-Token":this.token,'Content-Type':'application/json'}})
-		const data = await resp.json()
-            if(resp.ok){
-                this.users = data
-                console.log(this.users)
-			}
-			else{
-				alert('something went wrong');
-				localStorage.clear();
-				this.$push('/login');
-			}
-	}
+      try {
+        const userId = user.id; // Get the user ID
+        const endpoint = user.active ? `/deactivate_user/${userId}` : `/activate_user/${userId}`;
 
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authentication-Token": this.token
+          },
+        });
 
-}
+        if (!response.ok) {
+          throw new Error("Failed to update user status");
+        }
+
+        user.active = !user.active;
+      } catch (error) {
+        console.error("Error updating user status:", error);
+      }
+    },
+
+    async downloadReport() {
+      try {
+        const response = await fetch("http://127.0.0.1:5000/download-report", {
+          method: "GET",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to download the report");
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "service_report.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error downloading report:", error);
+        alert("Failed to download the report. Please try again.");
+      }
+    },
+
+    async searchProfessionals() {
+      const query = this.searchQuery.trim().toLowerCase();
+      if (!query) {
+        return;
+      }
+
+      this.professionals = this.users.filter(user => 
+        user.roles.some(role => role.name === 'professional') &&
+        (
+          user.name.toLowerCase().includes(query) ||
+          user.proffesional?.service?.toLowerCase().includes(query) ||
+          user.proffesional?.description?.toLowerCase().includes(query)
+        )
+      );
+    },
+
+    getButtonClass(pro) {
+      return pro.active ? "btn-danger" : "btn-success";
+    },
+
+    getButtonText(pro) {
+      return pro.active ? "Deactivate" : "Activate";
+    }
+  },
+
+  computed: {
+    customers() {
+      return this.users.filter(user => 
+        !user.roles.some(role => role.name === 'professional')
+      );
+    },
+
+    professionals() {
+      return this.users.filter(user => 
+        user.roles.some(role => role.name === 'professional')
+      );
+    }
+  },
+
+  async mounted() {
+    const resp = await fetch('/allusers', {
+      headers: {
+        "Authentication-Token": this.token,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      this.users = data.map(user => ({
+        ...user,
+        active: user.active || false // Ensure `active` exists
+      }));
+    } else {
+      alert('Something went wrong');
+      localStorage.clear();
+      this.$router.push('/login');
+    }
+  }
+};

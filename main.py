@@ -91,9 +91,9 @@ def download_report():
 @celery_app.on_after_finalize.connect
 def setup_periodic_tasks(sender, **kwargs):
     sender.add_periodic_task(
-        crontab(minute=0, hour=0, day_of_month=1), 
-        send_reminder_emails.s(),
-    )
+    crontab(minute=22, hour=53),  # Runs daily at midnight (00:00)
+    send_reminder_emails.s(),
+)
 
     sender.add_periodic_task(
         crontab(hour=00, minute=35),  # Runs at 00:00 on the 1st of every month
@@ -169,7 +169,7 @@ service_request_fields = {
 @app.get('/proffesional/service-requests')
 @auth_required('token')
 @roles_required('professional')
-@cache.cached(timeout=50)
+# @cache.cached(timeout=5)
 def get_proffesional_requests():
     # Fetch professional ID from current_user
     proffesional = Proffessional.query.filter_by(id=current_user.proffesional.id).first()
@@ -249,7 +249,7 @@ def all_services():
 @app.get('/allusers')
 @auth_required('token')
 @roles_accepted('customer', 'admin')
-@cache.cached(timeout=50)
+# @cache.cached(timeout=2)
 def allusers():
     users = User.query.all()
     if(len(users) == 0):
@@ -332,7 +332,60 @@ def deactivate_user(user_id):
 
 
 
+@app.route('/search-service', methods=['GET'])
+def search_service():
+    query = request.args.get('q', '').strip()
+    if not query:
+        return jsonify({"error": "Search query is required"}), 400
 
+    # Get services matching the query
+    services = Service.query.filter(Service.name.ilike(f"%{query}%")).all()
+    if not services:
+        return jsonify([])  # No services found, return empty list
+
+    # Get service IDs
+    service_ids = [s.id for s in services]
+
+    # Get professionals related to these services
+    professionals = (
+        db.session.query(Proffessional)
+        .join(User, Proffessional.user_id == User.id)
+        .filter(Proffessional.service_id.in_(service_ids))
+        .all()
+    )
+
+    results = [
+        {
+            "id": p.id,
+            "description": p.description,
+            "experience": p.experience,
+            "service": {"id": p.service.id, "name": p.service.name},
+            "user": {
+                "id": p.user.id,
+                "name": p.user.name,
+                "age": p.user.age,
+                "phone": p.user.phone,
+                "roles": [{"name": role.name} for role in p.user.roles],
+            },
+        }
+        for p in professionals
+    ]
+
+    return jsonify(results)
+
+@app.route('/search-professionals', methods=['GET'])
+@auth_required('token')
+@roles_required('admin')
+def search_professionals():
+    query = request.args.get('q', '').strip()
+
+    professionals = Proffessional.query.join(User).join(Service).filter(
+        (User.name.ilike(f"%{query}%")) |
+        (Service.name.ilike(f"%{query}%")) |
+        (Proffessional.description.ilike(f"%{query}%"))
+    ).all()
+
+    return jsonify([{"id": pro.user.id, "name": pro.user.name, "service": pro.service.name} for pro in professionals])
 
 if __name__ == "__main__":
     
