@@ -7,6 +7,8 @@ from resources import UserResource,Customer,service,userlogin,ServiceRequestAPI,
 from flask_security import Security,SQLAlchemyUserDatastore,auth_required,roles_required,roles_accepted,current_user
 from database import db
 import os
+import time
+from instances import cache
 from celery.schedules import crontab,timedelta
 from worker import celery_init_app
 
@@ -25,12 +27,15 @@ print(app.config['SQLALCHEMY_DATABASE_URI'])
 db.init_app(app)
 
 
+
  
 app.security = Security(app,datastore)
 app.app_context().push()
 celery_app = celery_init_app(app)
+cache.init_app(app)
 
-
+cache.set("test_key", "cached_value", timeout=10)
+print(cache.get("test_key")) 
 print(app.config['SECURITY_TOKEN_AUTHENTICATION_HEADER'])
 
 api.add_resource(UserResource,'/user/<int:user_id>')
@@ -59,6 +64,17 @@ with app.app_context():
         
         db.session.commit()
 
+@app.route('/test-cache')
+@cache.cached(timeout=30)  # Cache for 10 seconds
+def test_cache():
+    cached_data = cache.get("/test-cache")  
+    if cached_data:
+        print("🚀 Returning cached response!")  # Should print when cache works
+    else:
+        print("⚠️ Generating fresh response...")  # Should print only once every 10 sec
+    return f"Response at {time.time()}"
+
+
 
 @app.route('/download-report', methods=['GET'])
 def download_report():
@@ -85,6 +101,7 @@ def setup_periodic_tasks(sender, **kwargs):
     )
        
 @app.route('/trigger-report', methods=['GET'])
+@cache.cached(timeout=50)
 def trigger_report():
     """API to manually trigger the monthly report generation."""
     task = send_monthly_report.delay()  # Call Celery task asynchronously
@@ -152,6 +169,7 @@ service_request_fields = {
 @app.get('/proffesional/service-requests')
 @auth_required('token')
 @roles_required('professional')
+@cache.cached(timeout=50)
 def get_proffesional_requests():
     # Fetch professional ID from current_user
     proffesional = Proffessional.query.filter_by(id=current_user.proffesional.id).first()
@@ -193,6 +211,7 @@ def close_request(request_id):
 @app.get('/all_service_requests')
 @auth_required('token')
 @roles_accepted('admin','customer')
+@cache.cached(timeout=50)
 def all_service_requests():
     service_requests = Service_request.query.all()
     if len(service_requests) == 0:
@@ -219,6 +238,7 @@ def get_services():
 @app.get('/all_services')
 @auth_required('token')
 @roles_required('admin')
+@cache.cached(timeout=50)
 def all_services():
     services = Service.query.all()
     if(len(services) == 0):
@@ -229,6 +249,7 @@ def all_services():
 @app.get('/allusers')
 @auth_required('token')
 @roles_accepted('customer', 'admin')
+@cache.cached(timeout=50)
 def allusers():
     users = User.query.all()
     if(len(users) == 0):
@@ -239,6 +260,7 @@ def allusers():
 @app.route('/update_service/<int:service_id>', methods = ['POST'])
 @auth_required('token')
 @roles_required('admin')
+
 def update_services(service_id):
     
     try:

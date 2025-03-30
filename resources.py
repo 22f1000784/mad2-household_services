@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 from sqlalchemy.exc import SQLAlchemyError
+from instances import cache
 class userlogin(Resource):
      def post(self):
         data = request.get_json()
@@ -122,7 +123,7 @@ class service(Resource):
             message = json.dumps({"error":str(e)})
             resp = Response(message,status = 200, mimetype = 'application/json')
             return resp
-        
+    @cache.cached(timeout=50)    
     def get(self,service_id):
 
 
